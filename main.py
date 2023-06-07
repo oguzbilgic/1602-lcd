@@ -1,16 +1,26 @@
 from machine import Pin, Timer
 from time import sleep
 
+
 class Port:
-    def __init__(self, pin_nums, initial):
+    def __init__(self, pin_nums, initial, led_pin = False):
         self.pins = list(map(lambda pin: Pin(pin, Pin.OUT, initial), pin_nums))
+        
+        #if led_pin: self.led = Pin(led_pin, Pin.OUT)
         
     def send(self, bits):
         for pos, pin in enumerate(reversed(self.pins)):
             bit = (bits >> pos) & 1
             pin.value(bit)
-            #if bit : led.toggle() 
+            #if self.led : self.led.toggle() 
             #print("write", pos, pin, "value", pin.value())
+            #print(pinx.value())
+        if False:
+            timer = Timer()
+            timer.init(freq=0.5, mode=Timer.ONE_SHOT, callback = self.blink)
+    
+    def blink(self):
+        self.led.toggle()
             
     def set_in(self):
         for pos, pin in enumerate(self.pins):
@@ -21,13 +31,15 @@ class Port:
             print("read", pos, pin, "value", pin.value())
 
 class LCD:
-    #enable, readwrite, readselect
+    # Modes:
+    # enable, readwrite, readselect
     DONE = 0b000
     SEND = 0b100
     WRITE = 0b101
     BUSY = 0b110
     READ = 0b111
     
+    # Commands:
     CLEAR = 0x01
     HOME = 0x02
     
@@ -58,32 +70,24 @@ class LCD:
         self.mode_port = mode_port
         self.databus_port = databus_port
         
-        #self.write_ddram(0x3c)
-        
-        
-        sleep(0.01)
+        #self.pinrw = Pin(4, Pin.OUT)
+        #self.pinrs = Pin(3, Pin.OUT)
+        #self.pine = Pin(5, Pin.OUT)
+        #self.pinb = Pin(13, Pin.IN)
 
-        self.mode_port.send(self.DONE)
-        
-        
-        self.send_function(True, True, False)
-        self.send_function(True, True, False)
-        self.send_function(True, True, False)
         self.send_function(True, True, False)
         self.send_display(True, True, True)
-        
         self.send_clear()
         self.send_entry(True, False)
-                
-        self.display_string("hello/*&^%$#@")
         
     # works
     def x__init__(self, mode_port, databus_port):
         self.mode_port = mode_port
         self.databus_port = databus_port
+ 
         
         sleep(0.2)
-        self.write_ddram(0x3c)
+        #self.write_ddram(0x3c)
         
         self.send_function(True, True, False)
         self.send_display(True, True, True)
@@ -93,7 +97,7 @@ class LCD:
         self.send_entry(True, False)
         sleep(0.5)
                 
-        self.display_string("hello/*&^%$#@")
+        #self.display_string("hello/*&^%$#@")
     
     # TODO: Implement
     def read(self):
@@ -101,8 +105,23 @@ class LCD:
 
         self.mode_port.send(self.BUSY)
         self.databus_port.read()
-                
-    def send_instruction(self, instruction, mode = SEND):
+    
+    # TODO
+    def check_busy(self):
+        self.pinrs.value(0)
+        self.pinrw.value(1)
+        self.pine.value(1)
+        while self.pinb.value():
+            sleep(0.1)
+            print("busy")
+        print('done')
+        return(self.pinb.value())
+    
+    
+    # TODO: Check busy            
+    def send_instruction(self, instruction, mode = SEND, check_busy = True):
+        #if check_busy: self.check_busy()
+        
         self.databus_port.send(instruction)
         self.mode_port.send(mode)
         sleep(0.001)
@@ -122,8 +141,9 @@ class LCD:
         if shift: instruction += self.ENTRY_SIFHT
         
         self.send_instruction(instruction)
- 
-    # Can't turn display off when blinking
+
+    # Turns display, cursor and blinking on and off
+    # Note: ?Can't turn display off when blinking
     def send_display(self, on = True, cursor = False, blink = False):
         instruction = self.DISPLAY
         if on: instruction += self.DISPLAY_ON
@@ -131,22 +151,25 @@ class LCD:
         if on and cursor and blink: instruction += self.DISPLAY_BLINK
         
         self.send_instruction(instruction)
-         
+    
+    # Shifts the cursor or display
     def send_shift(self, display = True, right = True):
         instruction = self.SHIFT
         if display: instruction += self.SHIFT_DISPLAY
         if right: instruction += self.SHIFT_RIGHT
         
         self.send_instruction(instruction)
-                 
+    
+    # Sends a function instruction that is used for initizalizing the display
     def send_function(self, eight_bit = True, two_line = True, font_type = True):
         instruction = self.FUNCTION
         if eight_bit: instruction += self.FUNCTION_8_BIT
         if two_line: instruction += self.FUNCTION_TWO_LINE
         if font_type: instruction += self.FUNCTION_FONT_TYPE
                 
-        self.send_instruction(instruction)
-        
+        self.send_instruction(instruction, self.SEND, False)
+    
+    # Sets the cursor position
     def send_ddram_address(self, line = 1, column = 1):
         instruction = self.DDRAM_ADDRESS
         if line == 2 : instruction += self.DDRAM_ADDRESS_LINE_2
@@ -161,24 +184,24 @@ class LCD:
         for char in string:
             self.write_ddram(ord(char))
 
-def blink(timer):
-    led.toggle()
-    
-led = Pin(25, Pin.OUT)
-#timer = Timer()
-#timer.init(freq=2.5, mode=Timer.PERIODIC, callback = blink)
-
-mode_port = Port([5, 4, 3], 0)
-databus_port = Port(reversed(range(6, 14)), 0)
+mode_port = Port([5, 15, 3], 0)
+databus_port = Port(reversed(range(6, 14)), 0, 25)
 lcd = LCD(mode_port, databus_port)
 
+button = Pin(14, mode=Pin.OUT, pull = Pin.PULL_DOWN)
 
-button = Pin(14, Pin.PULL_DOWN)
+lcd.display_string("Press button to")
+lcd.send_ddram_address(2, 0)
+lcd.display_string("to count!")
 
+count = 0
 while False:
+    sleep(0.2)
     if button.value():
-        # do something
-        sleep(0.3)
+        lcd.send_clear()
+        lcd.display_string("Counter: "+str(count))
+        count +=1
+        sleep(0.5)
 
 
 
