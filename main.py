@@ -1,7 +1,6 @@
 from machine import Pin, Timer
 from time import sleep
 
-
 class Port:
     def __init__(self, pin_nums, initial, led_pin = False):
         self.pins = list(map(lambda pin: Pin(pin, Pin.OUT, initial), pin_nums))
@@ -70,34 +69,10 @@ class LCD:
         self.mode_port = mode_port
         self.databus_port = databus_port
 
-        #self.pinrw = Pin(4, Pin.OUT)
-        #self.pinrs = Pin(3, Pin.OUT)
-        #self.pine = Pin(5, Pin.OUT)
-        #self.pinb = Pin(13, Pin.IN)
-
         self.send_function(True, True, False)
         self.send_display(True, True, True)
         self.send_clear()
         self.send_entry(True, False)
-
-    # works
-    def x__init__(self, mode_port, databus_port):
-        self.mode_port = mode_port
-        self.databus_port = databus_port
-
-
-        sleep(0.2)
-        #self.write_ddram(0x3c)
-
-        self.send_function(True, True, False)
-        self.send_display(True, True, True)
-
-        self.send_clear()
-        sleep(0.3)
-        self.send_entry(True, False)
-        sleep(0.5)
-
-        #self.display_string("hello/*&^%$#@")
 
     # TODO: Implement
     def read(self):
@@ -116,7 +91,6 @@ class LCD:
             print("busy")
         print('done')
         return(self.pinb.value())
-
 
     # TODO: Check busy
     def send_instruction(self, instruction, mode = SEND, check_busy = True):
@@ -202,6 +176,3 @@ while False:
         lcd.display_string("Counter: "+str(count))
         count +=1
         sleep(0.5)
-
-
-
